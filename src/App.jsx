@@ -1,70 +1,77 @@
-import { ethers } from "ethers"
-import MulticallAbi from "./Multicall.json"
-import ContractAbi from "./Contract.json"
-import { multicall } from "./multicall"
-import _ from "lodash"
+import { ethers } from "ethers";
+import MulticallAbi from "./Multicall.json";
+import ContractAbi from "./Contract.json";
+import { multicall } from "./multicall";
+import _ from "lodash";
 
-import config from "./hashedMarketConfigKeys.json"
-import values from "./hashedMarketValuesKeys.json"
-import { useMemo, useState } from "react"
+import config from "./hashedMarketConfigKeys.json";
+import values from "./hashedMarketValuesKeys.json";
+import { useMemo, useState } from "react";
 
-const multicallAddress = "0xcA11bde05977b3631167028862bE2a173976CA11"
-const contractAddress = "0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8"
+const multicallAddress = "0xcA11bde05977b3631167028862bE2a173976CA11";
+const contractAddress = "0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8";
 
 const getProvider = () => {
   return new ethers.providers.StaticJsonRpcProvider(
     "https://arbitrum.drpc.org",
     { chainId: 42161 },
-  )
-}
+  );
+};
 
 function App() {
-  const [selectedPool, setSelectedPool] = useState()
-  console.log(">> Check | selectedPool:", selectedPool)
-  const [table, setTable] = useState()
+  const [selectedPool, setSelectedPool] = useState();
+  console.log(">> Check | selectedPool:", selectedPool);
+  const [table, setTable] = useState();
 
   const handleChange = (e) => {
-    setSelectedPool(e.target.value)
-  }
+    setSelectedPool(e.target.value);
+  };
 
   const merged = useMemo(() => {
     const customizer = (objValue, srcValue) => {
       if (_.isObject(objValue) && _.isObject(srcValue)) {
-        return _.mergeWith({}, objValue, srcValue, customizer)
+        return _.mergeWith({}, objValue, srcValue, customizer);
       }
 
-      return objValue ?? srcValue
-    }
+      return objValue ?? srcValue;
+    };
 
-    return _.mergeWith({}, config, values, customizer)
-  }, [])
+    return _.mergeWith({}, config, values, customizer);
+  }, []);
 
   const call = async () => {
-    const calls = []
+    const calls = [];
     for (const [, hash] of Object.entries(merged[selectedPool])) {
       calls.push({
         address: contractAddress,
         name: "getUint",
         params: [hash],
-      })
+      });
     }
 
     const multicallContract = new ethers.Contract(
       multicallAddress,
       MulticallAbi,
       getProvider(),
-    )
+    );
 
-    const dataMultiCall = await multicall(multicallContract, ContractAbi, calls)
+    const dataMultiCall = await multicall(
+      multicallContract,
+      ContractAbi,
+      calls,
+    );
 
-    const table = {}
+    const table = {};
     for (const index in Object.entries(merged[selectedPool])) {
-      const key = Object.entries(merged[selectedPool])[index][0]
-      table[key] = dataMultiCall[index][0].toString()
+      const key = Object.entries(merged[selectedPool])[index][0];
+      table[key] = {
+        value: dataMultiCall[index][0].toString(),
+        hash: Object.entries(merged[selectedPool])[index][1],
+      };
     }
 
-    setTable(table)
-  }
+    setTable(table);
+  };
   return (
     <>
       <label htmlFor="pool">Choose a pool:</label>
@@ -86,20 +93,22 @@ function App() {
             <tr>
               <th>Key</th>
               <th>Value</th>
+              <th>Hash</th>
             </tr>
           </thead>
           <tbody>
             {Object.entries(table).map(([key, value]) => (
               <tr key={key}>
                 <td>{key}</td>
-                <td>{value}</td>
+                <td>{value.value}</td>
+                <td>{value.hash}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
     </>
-  )
+  );
 }
 
-export default App
+export default App;
